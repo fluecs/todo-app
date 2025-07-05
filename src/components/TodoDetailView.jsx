@@ -1,36 +1,9 @@
 import { useState, useEffect } from 'react'
-import { X, CheckCircle, Circle, Calendar, Tag, AlertTriangle, Clock, GitBranch, FileText, List, CheckSquare, RotateCcw, ChevronDown } from 'lucide-react'
-import { format } from 'date-fns'
-import { getVersions, restoreVersion, updateItem, createVersion } from '../utils/indexedDB'
-import VersionHistory from './VersionHistory'
-
-const formatDate = (dateString) => {
-  if (!dateString || !dateString.trim()) return null
-  try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return null
-    return format(date, 'MMM dd, yyyy')
-  } catch (error) {
-    console.error('Invalid date:', dateString)
-    return null
-  }
-}
-
-const formatDateTime = (dateString) => {
-  if (!dateString || !dateString.trim()) return null
-  try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return null
-    return format(date, 'MMM dd, yyyy HH:mm')
-  } catch (error) {
-    console.error('Invalid date:', dateString)
-    return null
-  }
-}
+import { X, CheckCircle, Circle, Calendar, Tag, AlertTriangle, Clock, FileText, List, CheckSquare, ChevronDown } from 'lucide-react'
+import { updateItem } from '../utils/indexedDB'
+import { formatDate, isOverdue, getPriorityColor, getTypeIconLarge, getCategoryName } from '../utils/helpers'
 
 const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh }) => {
-  const [versions, setVersions] = useState([])
-  const [showVersions, setShowVersions] = useState(false)
   const [checklistItems, setChecklistItems] = useState(todo.checklistItems || [])
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false)
   const [currentTodo, setCurrentTodo] = useState(todo)
@@ -48,9 +21,7 @@ const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh
     }
 
     const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
+      if (event.key === 'Escape') onClose()
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -61,34 +32,15 @@ const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh
     }
   }, [showPriorityDropdown, onClose])
 
-  const getCategoryName = (categoryId) => {
-    const category = categories.find(c => c.id === categoryId)
-    return category ? category.name : null
-  }
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return '#ef4444'
-      case 'medium': return '#f59e0b'
-      case 'low': return '#10b981'
-      default: return '#6b7280'
+  const updateTodo = async (updates) => {
+    try {
+      const updatedTodo = { ...currentTodo, ...updates, updatedAt: new Date().toISOString() }
+      await updateItem('todos', updatedTodo)
+      setCurrentTodo(updatedTodo)
+      onRefresh()
+    } catch (error) {
+      console.error('Failed to update todo:', error)
     }
-  }
-
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'memo': return <FileText size={20} />
-      case 'list': return <List size={20} />
-      case 'checklist': return <CheckSquare size={20} />
-      default: return <FileText size={20} />
-    }
-  }
-
-  const isOverdue = (date) => {
-    if (!date || !date.trim()) return false
-    const dueDate = new Date(date)
-    const today = new Date()
-    return dueDate < today && dueDate.toDateString() !== today.toDateString()
   }
 
   const handleChecklistToggle = async (index) => {
@@ -96,73 +48,56 @@ const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh
       i === index ? { ...item, completed: !item.completed } : item
     )
     setChecklistItems(updatedItems)
-    
-    // Update the todo with new checklist state
-    const updatedTodo = {
-      ...currentTodo,
-      checklistItems: updatedItems,
-      updatedAt: new Date().toISOString()
-    }
-    
-    try {
-      await updateItem('todos', updatedTodo)
-      await createVersion(currentTodo.id, updatedTodo)
-      setCurrentTodo(updatedTodo)
-      onRefresh() // Refresh the parent component
-    } catch (error) {
-      console.error('Failed to update checklist:', error)
-    }
-  }
-
-  const handleShowVersions = async () => {
-    try {
-      const todoVersions = await getVersions(todo.id)
-      setVersions(todoVersions)
-      setShowVersions(true)
-    } catch (error) {
-      console.error('Failed to load versions:', error)
-    }
-  }
-
-  const handleRestoreVersion = async (versionId) => {
-    if (window.confirm('Are you sure you want to restore this version? This will overwrite the current version.')) {
-      try {
-        await restoreVersion(currentTodo.id, versionId)
-        setShowVersions(false)
-        onRefresh() // Refresh the parent component
-      } catch (error) {
-        console.error('Failed to restore version:', error)
-      }
-    }
+    await updateTodo({ checklistItems: updatedItems })
   }
 
   const handlePriorityChange = async (newPriority) => {
-    try {
-      const updatedTodo = {
-        ...currentTodo,
-        priority: newPriority,
-        updatedAt: new Date().toISOString()
-      }
-      
-      await updateItem('todos', updatedTodo)
-      await createVersion(currentTodo.id, updatedTodo)
-      setCurrentTodo(updatedTodo)
-      setShowPriorityDropdown(false)
-      onRefresh()
-    } catch (error) {
-      console.error('Failed to update priority:', error)
-    }
+    await updateTodo({ priority: newPriority })
+    setShowPriorityDropdown(false)
   }
 
+  const PriorityDropdown = () => (
+    <div className="priority-selector">
+      <button
+        onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+        className="priority-dropdown-btn"
+        style={{ backgroundColor: getPriorityColor(currentTodo.priority) }}
+      >
+        {currentTodo.priority}
+        <ChevronDown size={14} />
+      </button>
+      {showPriorityDropdown && (
+        <div className="priority-dropdown">
+          {['low', 'medium', 'high'].map(priority => (
+            <button
+              key={priority}
+              onClick={() => handlePriorityChange(priority)}
+              className={`priority-option ${currentTodo.priority === priority ? 'active' : ''}`}
+            >
+              {priority.charAt(0).toUpperCase() + priority.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const DetailSection = ({ title, children }) => children && (
+    <div className={`detail-${title.toLowerCase().replace(' ', '')}`}>
+      <h3>{title}</h3>
+      {children}
+    </div>
+  )
+
   return (
-    <div className="todo-detail-overlay">
+    <div className="modal-overlay">
       <button onClick={onClose} className="modal-close-btn">
         <X size={24} />
       </button>
-      <div className="todo-detail">
+      <div className="modal modal-large">
         <div className="detail-header">
           <div className="detail-title">
-            {getTypeIcon(currentTodo.type)}
+            {getTypeIconLarge(currentTodo.type)}
             <h2>{currentTodo.title}</h2>
           </div>
         </div>
@@ -173,7 +108,7 @@ const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh
             {currentTodo.categoryId && (
               <>
                 <span className="separator">•</span>
-                <span className="category">{getCategoryName(currentTodo.categoryId)}</span>
+                <span className="category">{getCategoryName(categories, currentTodo.categoryId)}</span>
               </>
             )}
             {currentTodo.dueDate && formatDate(currentTodo.dueDate) && (
@@ -188,38 +123,7 @@ const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh
           </div>
           
           <div className="meta-row">
-            <div className="priority-selector">
-              <button
-                onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-                className="priority-dropdown-btn"
-                style={{ backgroundColor: getPriorityColor(currentTodo.priority) }}
-              >
-                {currentTodo.priority}
-                <ChevronDown size={14} />
-              </button>
-              {showPriorityDropdown && (
-                <div className="priority-dropdown">
-                  <button
-                    onClick={() => handlePriorityChange('low')}
-                    className={`priority-option ${currentTodo.priority === 'low' ? 'active' : ''}`}
-                  >
-                    Low
-                  </button>
-                  <button
-                    onClick={() => handlePriorityChange('medium')}
-                    className={`priority-option ${currentTodo.priority === 'medium' ? 'active' : ''}`}
-                  >
-                    Medium
-                  </button>
-                  <button
-                    onClick={() => handlePriorityChange('high')}
-                    className={`priority-option ${currentTodo.priority === 'high' ? 'active' : ''}`}
-                  >
-                    High
-                  </button>
-                </div>
-              )}
-            </div>
+            <PriorityDropdown />
             <span className="created-date">
               <Clock size={12} />
               Created {formatDate(currentTodo.createdAt) || 'Unknown date'}
@@ -227,73 +131,50 @@ const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh
           </div>
         </div>
 
-        {currentTodo.content && (
-          <div className="detail-content">
-            <h3>Content</h3>
-            <p>{currentTodo.content}</p>
-          </div>
-        )}
+        <DetailSection title="Content">
+          <p>{currentTodo.content}</p>
+        </DetailSection>
 
-        {currentTodo.type === 'list' && currentTodo.listItems && currentTodo.listItems.length > 0 && (
-          <div className="detail-list">
-            <h3>List Items</h3>
-            <div className="list-items">
-              {currentTodo.listItems.map((item, index) => (
-                <div key={index} className="list-item">
-                  <div className="list-bullet">•</div>
-                  <span>{item}</span>
+        <DetailSection title="List Items">
+          <div className="list-items">
+            {currentTodo.listItems?.map((item, index) => (
+              <div key={index} className="list-item">
+                <div className="list-bullet">•</div>
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </DetailSection>
+
+        <DetailSection title={`Checklist (${checklistItems.filter(item => item.completed).length} of ${checklistItems.length} completed)`}>
+          <div className="checklist-items">
+            {checklistItems.map((item, index) => (
+              <div 
+                key={index} 
+                className={`checklist-item ${item.completed ? 'completed' : ''}`}
+                onClick={() => handleChecklistToggle(index)}
+              >
+                <div className="checklist-toggle">
+                  {item.completed ? <CheckCircle size={18} /> : <Circle size={18} />}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {currentTodo.type === 'checklist' && checklistItems && checklistItems.length > 0 && (
-          <div className="detail-checklist">
-            <h3>Checklist ({checklistItems.filter(item => item.completed).length} of {checklistItems.length} completed)</h3>
-            <div className="checklist-items">
-              {checklistItems.map((item, index) => (
-                <div 
-                  key={index} 
-                  className={`checklist-item ${item.completed ? 'completed' : ''}`}
-                  onClick={() => handleChecklistToggle(index)}
-                >
-                  <div className="checklist-toggle">
-                    {item.completed ? <CheckCircle size={18} /> : <Circle size={18} />}
-                  </div>
-                  <span className={item.completed ? 'completed' : ''}>
-                    {item.text}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {currentTodo.tags && currentTodo.tags.length > 0 && (
-          <div className="detail-tags">
-            <h3>Tags</h3>
-            <div className="tags-list">
-              {currentTodo.tags.map(tag => (
-                <span key={tag} className="tag">
-                  <Tag size={12} />
-                  {tag}
+                <span className={item.completed ? 'completed' : ''}>
+                  {item.text}
                 </span>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        )}
+        </DetailSection>
 
-
-
-        {showVersions && (
-          <VersionHistory
-            versions={versions}
-            onRestore={handleRestoreVersion}
-            onClose={() => setShowVersions(false)}
-            currentTodo={currentTodo}
-          />
-        )}
+        <DetailSection title="Tags">
+          <div className="tags-list">
+            {currentTodo.tags?.map(tag => (
+              <span key={tag} className="tag">
+                <Tag size={12} />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </DetailSection>
       </div>
     </div>
   )

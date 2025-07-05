@@ -12,14 +12,10 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
     dueDate: '',
     checklistItems: [],
     listItems: [],
-    tags: [],
-    customColor: null
+    tags: []
   })
-  const [newChecklistItem, setNewChecklistItem] = useState('')
-  const [newListItem, setNewListItem] = useState('')
-  const [newTag, setNewTag] = useState('')
-  const [expandedChecklist, setExpandedChecklist] = useState(false)
-  const [expandedList, setExpandedList] = useState(false)
+  const [newItems, setNewItems] = useState({ checklist: '', list: '', tag: '' })
+  const [expanded, setExpanded] = useState({ checklist: false, list: false })
 
   useEffect(() => {
     if (editingTodo) {
@@ -32,11 +28,12 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
         dueDate: editingTodo.dueDate ? format(new Date(editingTodo.dueDate), 'yyyy-MM-dd') : '',
         checklistItems: editingTodo.checklistItems || [],
         listItems: editingTodo.listItems || [],
-        tags: editingTodo.tags || [],
-        customColor: editingTodo.customColor || null
+        tags: editingTodo.tags || []
       })
     }
   }, [editingTodo])
+
+  const updateForm = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -48,45 +45,30 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
       content: formData.content.trim()
     }
 
-    if (editingTodo) {
-      onSubmit(editingTodo.id, submitData)
-    } else {
-      onSubmit(submitData)
+    onSubmit(editingTodo?.id, submitData)
+  }
+
+  const addItem = (type) => {
+    const value = newItems[type].trim()
+    if (!value) return
+
+    const updates = {
+      checklist: { checklistItems: [...formData.checklistItems, { text: value, completed: false }] },
+      list: { listItems: [...formData.listItems, value] },
+      tag: { tags: formData.tags.includes(value) ? formData.tags : [...formData.tags, value] }
     }
+
+    setFormData(prev => ({ ...prev, ...updates[type] }))
+    setNewItems(prev => ({ ...prev, [type]: '' }))
   }
 
-  const addChecklistItem = () => {
-    if (newChecklistItem.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        checklistItems: [...prev.checklistItems, { text: newChecklistItem.trim(), completed: false }]
-      }))
-      setNewChecklistItem('')
+  const removeItem = (type, index) => {
+    const updates = {
+      checklist: { checklistItems: formData.checklistItems.filter((_, i) => i !== index) },
+      list: { listItems: formData.listItems.filter((_, i) => i !== index) },
+      tag: { tags: formData.tags.filter((_, i) => i !== index) }
     }
-  }
-
-  const addListItem = () => {
-    if (newListItem.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        listItems: [...prev.listItems, newListItem.trim()]
-      }))
-      setNewListItem('')
-    }
-  }
-
-  const removeChecklistItem = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      checklistItems: prev.checklistItems.filter((_, i) => i !== index)
-    }))
-  }
-
-  const removeListItem = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      listItems: prev.listItems.filter((_, i) => i !== index)
-    }))
+    setFormData(prev => ({ ...prev, ...updates[type] }))
   }
 
   const toggleChecklistItem = (index) => {
@@ -98,35 +80,83 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
     }))
   }
 
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }))
-      setNewTag('')
-    }
-  }
+  const TypeButton = ({ type, icon: Icon, label }) => (
+    <button
+      type="button"
+      className={`type-btn ${formData.type === type ? 'active' : ''}`}
+      onClick={() => updateForm('type', type)}
+    >
+      <Icon size={16} />
+      {label}
+    </button>
+  )
 
-  const removeTag = (tagToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }))
-  }
-
-  const getCategoryName = (categoryId) => {
-    const category = categories.find(c => c.id === categoryId)
-    return category ? category.name : 'Select Category'
+  const ItemList = ({ items, type, maxItems = 3 }) => {
+    if (!items?.length) return null
+    
+    const displayItems = items.slice(0, expanded[type] ? undefined : maxItems)
+    const remaining = items.length - maxItems
+    
+    return (
+      <div className={`${type}-items`}>
+        {displayItems.map((item, index) => (
+          <div key={index} className={`${type}-item`}>
+            {type === 'checklist' ? (
+              <>
+                <div className="checkbox-container">
+                  <input
+                    type="checkbox"
+                    checked={item.completed}
+                    onChange={() => toggleChecklistItem(index)}
+                  />
+                </div>
+                <span className={item.completed ? 'completed' : ''}>{item.text}</span>
+              </>
+            ) : (
+              <>
+                <div className="list-bullet">•</div>
+                <span>{item}</span>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => removeItem(type, index)}
+              className="remove-item-btn"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+        {remaining > 0 && (
+          <button
+            type="button"
+            className="expand-btn"
+            onClick={() => setExpanded(prev => ({ ...prev, [type]: !prev[type] }))}
+          >
+            {expanded[type] ? 'Show less' : `+${remaining} more items`}
+          </button>
+        )}
+        <div className={`add-${type}-item`}>
+          <input
+            type="text"
+            value={newItems[type]}
+            onChange={(e) => setNewItems(prev => ({ ...prev, [type]: e.target.value }))}
+            placeholder={`Add ${type} item...`}
+            onKeyPress={(e) => e.key === 'Enter' && addItem(type)}
+          />
+          <button type="button" onClick={() => addItem(type)}>Add</button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="todo-form-overlay">
+    <div className="modal-overlay">
       <button onClick={onCancel} className="modal-close-btn">
         <X size={24} />
       </button>
-      <div className="todo-form">
-        <div className="form-header">
+      <div className="modal">
+        <div className="modal-header">
           <h2>{editingTodo ? 'Edit Todo' : 'Add New Todo'}</h2>
         </div>
 
@@ -134,30 +164,9 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
           <div className="form-group">
             <label>Type</label>
             <div className="type-selector">
-              <button
-                type="button"
-                className={`type-btn ${formData.type === 'memo' ? 'active' : ''}`}
-                onClick={() => setFormData(prev => ({ ...prev, type: 'memo' }))}
-              >
-                <FileText size={16} />
-                Memo
-              </button>
-              <button
-                type="button"
-                className={`type-btn ${formData.type === 'list' ? 'active' : ''}`}
-                onClick={() => setFormData(prev => ({ ...prev, type: 'list' }))}
-              >
-                <List size={16} />
-                List
-              </button>
-              <button
-                type="button"
-                className={`type-btn ${formData.type === 'checklist' ? 'active' : ''}`}
-                onClick={() => setFormData(prev => ({ ...prev, type: 'checklist' }))}
-              >
-                <CheckSquare size={16} />
-                Checklist
-              </button>
+              <TypeButton type="memo" icon={FileText} label="Memo" />
+              <TypeButton type="list" icon={List} label="List" />
+              <TypeButton type="checklist" icon={CheckSquare} label="Checklist" />
             </div>
           </div>
 
@@ -166,7 +175,7 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
             <input
               type="text"
               value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              onChange={(e) => updateForm('title', e.target.value)}
               placeholder="Enter title..."
               required
             />
@@ -176,7 +185,7 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
             <label>Content</label>
             <textarea
               value={formData.content}
-              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+              onChange={(e) => updateForm('content', e.target.value)}
               placeholder="Enter content..."
               rows={4}
             />
@@ -187,16 +196,11 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
               <label>Category</label>
               <select
                 value={formData.categoryId || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  categoryId: e.target.value ? parseInt(e.target.value) : null 
-                }))}
+                onChange={(e) => updateForm('categoryId', e.target.value ? parseInt(e.target.value) : null)}
               >
                 <option value="">No Category</option>
                 {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
+                  <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
               </select>
             </div>
@@ -205,7 +209,7 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
               <label>Priority</label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                onChange={(e) => updateForm('priority', e.target.value)}
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -219,118 +223,21 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
             <input
               type="date"
               value={formData.dueDate}
-              onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+              onChange={(e) => updateForm('dueDate', e.target.value)}
             />
-          </div>
-
-          <div className="form-group">
-            <label>Custom Color</label>
-            <div className="color-picker">
-              <input
-                type="color"
-                value={formData.customColor || '#ffffff'}
-                onChange={(e) => setFormData(prev => ({ ...prev, customColor: e.target.value }))}
-                className="color-input"
-              />
-              <button
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, customColor: null }))}
-                className="clear-color-btn"
-              >
-                Clear
-              </button>
-            </div>
           </div>
 
           {formData.type === 'list' && (
             <div className="form-group">
               <label>List Items</label>
-              <div className="list-items">
-                {formData.listItems.slice(0, expandedList ? undefined : 3).map((item, index) => (
-                  <div key={index} className="list-item">
-                    <div className="list-bullet">•</div>
-                    <span>{item}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeListItem(index)}
-                      className="remove-item-btn"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                {formData.listItems.length > 3 && (
-                  <button
-                    type="button"
-                    className="expand-btn"
-                    onClick={() => setExpandedList(!expandedList)}
-                  >
-                    {expandedList ? 'Show less' : `+${formData.listItems.length - 3} more items`}
-                  </button>
-                )}
-                <div className="add-list-item">
-                  <input
-                    type="text"
-                    value={newListItem}
-                    onChange={(e) => setNewListItem(e.target.value)}
-                    placeholder="Add list item..."
-                    onKeyPress={(e) => e.key === 'Enter' && addListItem()}
-                  />
-                  <button type="button" onClick={addListItem}>
-                    Add
-                  </button>
-                </div>
-              </div>
+              <ItemList items={formData.listItems} type="list" />
             </div>
           )}
 
           {formData.type === 'checklist' && (
             <div className="form-group">
               <label>Checklist Items</label>
-              <div className="checklist-items">
-                {formData.checklistItems.slice(0, expandedChecklist ? undefined : 3).map((item, index) => (
-                  <div key={index} className="checklist-item">
-                    <div className="checkbox-container">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={() => toggleChecklistItem(index)}
-                      />
-                    </div>
-                    <span className={item.completed ? 'completed' : ''}>
-                      {item.text}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeChecklistItem(index)}
-                      className="remove-item-btn"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                {formData.checklistItems.length > 3 && (
-                  <button
-                    type="button"
-                    className="expand-btn"
-                    onClick={() => setExpandedChecklist(!expandedChecklist)}
-                  >
-                    {expandedChecklist ? 'Show less' : `+${formData.checklistItems.length - 3} more items`}
-                  </button>
-                )}
-                <div className="add-checklist-item">
-                  <input
-                    type="text"
-                    value={newChecklistItem}
-                    onChange={(e) => setNewChecklistItem(e.target.value)}
-                    placeholder="Add checklist item..."
-                    onKeyPress={(e) => e.key === 'Enter' && addChecklistItem()}
-                  />
-                  <button type="button" onClick={addChecklistItem}>
-                    Add
-                  </button>
-                </div>
-              </div>
+              <ItemList items={formData.checklistItems} type="checklist" />
             </div>
           )}
 
@@ -342,7 +249,7 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
                   {tag}
                   <button
                     type="button"
-                    onClick={() => removeTag(tag)}
+                    onClick={() => removeItem('tag', formData.tags.indexOf(tag))}
                     className="remove-tag-btn"
                   >
                     <X size={12} />
@@ -352,23 +259,19 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
               <div className="add-tag">
                 <input
                   type="text"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
+                  value={newItems.tag}
+                  onChange={(e) => setNewItems(prev => ({ ...prev, tag: e.target.value }))}
                   placeholder="Add tag..."
-                  onKeyPress={(e) => e.key === 'Enter' && addTag()}
+                  onKeyPress={(e) => e.key === 'Enter' && addItem('tag')}
                 />
-                <button type="button" onClick={addTag}>
-                  Add
-                </button>
+                <button type="button" onClick={() => addItem('tag')}>Add</button>
               </div>
             </div>
           </div>
 
           <div className="form-actions">
-            <button type="button" onClick={onCancel} className="cancel-btn">
-              Cancel
-            </button>
-            <button type="submit" className="submit-btn">
+            <button type="button" onClick={onCancel} className="btn btn-secondary">Cancel</button>
+            <button type="submit" className="btn btn-primary">
               {editingTodo ? 'Update' : 'Create'}
             </button>
           </div>

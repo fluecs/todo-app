@@ -14,6 +14,43 @@ const TopNav = ({
   setDarkMode,
   onAddNew 
 }) => {
+  const addTag = (tag) => {
+    if (tag && !selectedTags.includes(tag)) {
+      setSelectedTags([...selectedTags, tag])
+    }
+  }
+
+  const removeTag = (tagToRemove) => {
+    setSelectedTags(selectedTags.filter(tag => tag !== tagToRemove))
+  }
+
+  const TagFilter = () => (
+    <div className="tag-filter">
+      <select
+        value=""
+        onChange={(e) => addTag(e.target.value)}
+        className="tag-select"
+      >
+        <option value="">Filter by tag</option>
+        {availableTags.map(tag => (
+          <option key={tag} value={tag}>{tag}</option>
+        ))}
+      </select>
+      {selectedTags.length > 0 && (
+        <div className="selected-tags">
+          {selectedTags.map(tag => (
+            <span key={tag} className="selected-tag">
+              {tag}
+              <button onClick={() => removeTag(tag)} className="remove-tag-btn">
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <nav className="top-nav">
       <div className="nav-left">
@@ -25,7 +62,7 @@ const TopNav = ({
           <Search className="search-icon" size={20} />
           <input
             type="text"
-            placeholder="Search todos..."
+            placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
@@ -35,37 +72,7 @@ const TopNav = ({
       
       <div className="nav-right">
         <div className="filter-controls">
-          <div className="tag-filter">
-            <select
-              value=""
-              onChange={(e) => {
-                if (e.target.value && !selectedTags.includes(e.target.value)) {
-                  setSelectedTags([...selectedTags, e.target.value])
-                }
-              }}
-              className="tag-select"
-            >
-              <option value="">Filter by tag...</option>
-              {availableTags.map(tag => (
-                <option key={tag} value={tag}>{tag}</option>
-              ))}
-            </select>
-            {selectedTags.length > 0 && (
-              <div className="selected-tags">
-                {selectedTags.map(tag => (
-                  <span key={tag} className="selected-tag">
-                    {tag}
-                    <button
-                      onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
-                      className="remove-tag-btn"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <TagFilter />
           
           <select
             value={filterBy}

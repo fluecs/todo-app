@@ -6,8 +6,7 @@ const DB_VERSION = 1;
 // Database stores
 const STORES = {
   TODOS: 'todos',
-  CATEGORIES: 'categories',
-  VERSIONS: 'versions'
+  CATEGORIES: 'categories'
 };
 
 // Initialize the database
@@ -36,18 +35,11 @@ export const initDB = () => {
         const categoriesStore = db.createObjectStore(STORES.CATEGORIES, { keyPath: 'id', autoIncrement: true });
         categoriesStore.createIndex('name', 'name', { unique: true });
       }
-
-      // Create versions store
-      if (!db.objectStoreNames.contains(STORES.VERSIONS)) {
-        const versionsStore = db.createObjectStore(STORES.VERSIONS, { keyPath: 'id', autoIncrement: true });
-        versionsStore.createIndex('todoId', 'todoId', { unique: false });
-        versionsStore.createIndex('createdAt', 'createdAt', { unique: false });
-      }
     };
   });
 };
 
-// Generic CRUD operations
+// Generic database operations
 const getDB = () => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -56,70 +48,33 @@ const getDB = () => {
   });
 };
 
-// Add item to store
-export const addItem = async (storeName, item) => {
+const executeTransaction = async (storeName, mode, operation) => {
   const db = await getDB();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readwrite');
+    const transaction = db.transaction([storeName], mode);
     const store = transaction.objectStore(storeName);
-    const request = store.add(item);
+    const request = operation(store);
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 };
 
-// Get all items from store
-export const getAllItems = async (storeName) => {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readonly');
-    const store = transaction.objectStore(storeName);
-    const request = store.getAll();
+// CRUD operations
+export const addItem = (storeName, item) => 
+  executeTransaction(storeName, 'readwrite', store => store.add(item));
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
+export const getAllItems = (storeName) => 
+  executeTransaction(storeName, 'readonly', store => store.getAll());
 
-// Get item by ID
-export const getItemById = async (storeName, id) => {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readonly');
-    const store = transaction.objectStore(storeName);
-    const request = store.get(id);
+export const getItemById = (storeName, id) => 
+  executeTransaction(storeName, 'readonly', store => store.get(id));
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
+export const updateItem = (storeName, item) => 
+  executeTransaction(storeName, 'readwrite', store => store.put(item));
 
-// Update item
-export const updateItem = async (storeName, item) => {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readwrite');
-    const store = transaction.objectStore(storeName);
-    const request = store.put(item);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-// Delete item
-export const deleteItem = async (storeName, id) => {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readwrite');
-    const store = transaction.objectStore(storeName);
-    const request = store.delete(id);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
+export const deleteItem = (storeName, id) => 
+  executeTransaction(storeName, 'readwrite', store => store.delete(id));
 
 // Search items
 export const searchItems = async (storeName, query, searchFields = ['title', 'content']) => {
@@ -128,7 +83,7 @@ export const searchItems = async (storeName, query, searchFields = ['title', 'co
   
   return items.filter(item => 
     searchFields.some(field => 
-      item[field] && item[field].toLowerCase().includes(lowerQuery)
+      item[field]?.toLowerCase().includes(lowerQuery)
     )
   );
 };
@@ -145,38 +100,6 @@ export const getItemsByIndex = async (storeName, indexName, value) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
-};
-
-// Version control functions
-export const createVersion = async (todoId, todoData) => {
-  const version = {
-    todoId,
-    data: todoData,
-    createdAt: new Date().toISOString(),
-    versionNumber: await getNextVersionNumber(todoId)
-  };
-  
-  return addItem(STORES.VERSIONS, version);
-};
-
-export const getVersions = async (todoId) => {
-  const versions = await getItemsByIndex(STORES.VERSIONS, 'todoId', todoId);
-  return versions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-};
-
-export const getNextVersionNumber = async (todoId) => {
-  const versions = await getVersions(todoId);
-  return versions.length + 1;
-};
-
-export const restoreVersion = async (todoId, versionId) => {
-  const version = await getItemById(STORES.VERSIONS, versionId);
-  if (version) {
-    const restoredTodo = { ...version.data, id: todoId };
-    await updateItem(STORES.TODOS, restoredTodo);
-    return restoredTodo;
-  }
-  throw new Error('Version not found');
 };
 
 // Export store names for use in components

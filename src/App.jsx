@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { initDB, getAllItems, addItem, updateItem, deleteItem, createVersion } from './utils/indexedDB'
+import { initDB, getAllItems, addItem, updateItem, deleteItem } from './utils/indexedDB'
+import { filterTodos, sortTodos, createTodoData, updateTodoData, getStoredDarkMode, setStoredDarkMode } from './utils/helpers'
 import TopNav from './components/TopNav'
 import Sidebar from './components/Sidebar'
 import TodoList from './components/TodoList'
@@ -17,36 +18,29 @@ function App() {
   const [showForm, setShowForm] = useState(false)
   const [editingTodo, setEditingTodo] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode')
-    return saved ? JSON.parse(saved) : false
-  })
+  const [darkMode, setDarkMode] = useState(getStoredDarkMode)
 
   useEffect(() => {
-    const initializeApp = async () => {
+    const init = async () => {
       try {
         await initDB()
-        // Load initial data
-        loadTodos()
-        loadCategories()
+        await Promise.all([loadTodos(), loadCategories()])
       } catch (error) {
         console.error('Failed to initialize app:', error)
       } finally {
         setIsLoading(false)
       }
     }
-
-    initializeApp()
+    init()
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode))
+    setStoredDarkMode(darkMode)
   }, [darkMode])
 
   const loadTodos = async () => {
     try {
-      const todosData = await getAllItems('todos')
-      setTodos(todosData)
+      setTodos(await getAllItems('todos'))
     } catch (error) {
       console.error('Failed to load todos:', error)
     }
@@ -54,51 +48,30 @@ function App() {
 
   const loadCategories = async () => {
     try {
-      const categoriesData = await getAllItems('categories')
-      setCategories(categoriesData)
+      setCategories(await getAllItems('categories'))
     } catch (error) {
       console.error('Failed to load categories:', error)
     }
   }
 
-  const handleAddTodo = async (todoData) => {
+  const handleTodoAction = async (action, data) => {
     try {
-      const newTodo = {
-        ...todoData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        completed: false
-      }
-      
-      const todoId = await addItem('todos', newTodo)
-      await createVersion(todoId, newTodo)
-      
+      await action(data)
       await loadTodos()
       setShowForm(false)
       setEditingTodo(null)
     } catch (error) {
-      console.error('Failed to add todo:', error)
+      console.error('Todo action failed:', error)
     }
   }
 
-  const handleUpdateTodo = async (todoId, updatedData) => {
-    try {
-      const updatedTodo = {
-        ...updatedData,
-        id: todoId,
-        updatedAt: new Date().toISOString()
-      }
-      
-      await updateItem('todos', updatedTodo)
-      await createVersion(todoId, updatedTodo)
-      
-      await loadTodos()
-      setShowForm(false)
-      setEditingTodo(null)
-    } catch (error) {
-      console.error('Failed to update todo:', error)
-    }
-  }
+  const handleAddTodo = (todoData) => handleTodoAction(
+    () => addItem('todos', createTodoData(todoData))
+  )
+
+  const handleUpdateTodo = (todoId, updatedData) => handleTodoAction(
+    () => updateItem('todos', updateTodoData(todoId, updatedData))
+  )
 
   const handleDeleteTodo = async (todoId) => {
     if (window.confirm('Are you sure you want to delete this todo? This action cannot be undone.')) {
@@ -111,32 +84,12 @@ function App() {
     }
   }
 
-  const handleDuplicateTodo = async (todo) => {
-    try {
-      const duplicatedTodo = {
-        title: `${todo.title} (Copy)`,
-        content: todo.content || '',
-        type: todo.type || 'memo',
-        categoryId: todo.categoryId || null,
-        priority: todo.priority || 'medium',
-        dueDate: todo.dueDate || '',
-        checklistItems: todo.checklistItems || [],
-        listItems: todo.listItems || [],
-        tags: todo.tags || [],
-        customColor: todo.customColor || null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        completed: false
-      }
-      
-      const todoId = await addItem('todos', duplicatedTodo)
-      await createVersion(todoId, duplicatedTodo)
-      
-      await loadTodos()
-    } catch (error) {
-      console.error('Failed to duplicate todo:', error)
-    }
-  }
+  const handleDuplicateTodo = (todo) => handleTodoAction(
+    () => addItem('todos', createTodoData({
+      ...todo,
+      title: `${todo.title} (Copy)`
+    }))
+  )
 
   const handleToggleComplete = async (todoId) => {
     const todo = todos.find(t => t.id === todoId)
@@ -145,51 +98,12 @@ function App() {
     }
   }
 
-  // Get all available tags from todos
   const availableTags = [...new Set(todos.flatMap(todo => todo.tags || []))]
 
-  const filteredAndSortedTodos = todos
-    .filter(todo => {
-      // Filter by category
-      if (selectedCategory && todo.categoryId !== selectedCategory) return false
-      
-      // Filter by completion status
-      if (filterBy === 'completed' && !todo.completed) return false
-      if (filterBy === 'pending' && todo.completed) return false
-      
-      // Filter by tags
-      if (selectedTags.length > 0) {
-        const todoTags = todo.tags || []
-        if (!selectedTags.some(tag => todoTags.includes(tag))) return false
-      }
-      
-      // Filter by search query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        return (
-          todo.title?.toLowerCase().includes(query) ||
-          todo.content?.toLowerCase().includes(query)
-        )
-      }
-      
-      return true
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'priority':
-          const priorityOrder = { high: 3, medium: 2, low: 1 }
-          return priorityOrder[b.priority] - priorityOrder[a.priority]
-        case 'dueDate':
-          if (!a.dueDate) return 1
-          if (!b.dueDate) return -1
-          return new Date(a.dueDate) - new Date(b.dueDate)
-        case 'title':
-          return (a.title || '').localeCompare(b.title || '')
-        case 'createdAt':
-        default:
-          return new Date(b.createdAt) - new Date(a.createdAt)
-      }
-    })
+  const filteredAndSortedTodos = sortTodos(
+    filterTodos(todos, { selectedCategory, filterBy, selectedTags, searchQuery }),
+    sortBy
+  )
 
   if (isLoading) {
     return (

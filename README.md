@@ -1,6 +1,6 @@
 # Todo App
 
-A comprehensive React-based todo application with advanced features including IndexedDB storage, version control, and multiple todo types.
+A comprehensive React-based todo application with advanced features including IndexedDB storage and multiple todo types.
 
 ## Features
 
@@ -17,11 +17,7 @@ A comprehensive React-based todo application with advanced features including In
 - **Sort Options**: Sort by creation date, due date, priority, or title
 - **Category Filtering**: Filter todos by specific categories
 
-### 📊 Version Control System
-- **Automatic Versioning**: Every change creates a new version
-- **Version History**: View all previous versions of a todo
-- **Restore Functionality**: Restore any previous version
-- **Branch-like System**: Similar to Git version control
+
 
 ### 💾 Data Storage
 - **IndexedDB**: Client-side database for persistent storage
@@ -92,12 +88,7 @@ npm run build
 3. Edit categories by clicking the edit icon
 4. Delete categories by clicking the delete icon
 
-### Using Version Control
 
-1. Click the version control icon (Git branch) on any todo
-2. View the version history with timestamps
-3. Click "Restore" on any version to revert to that state
-4. Confirm the restoration when prompted
 
 ### Searching and Filtering
 
@@ -115,7 +106,7 @@ src/
 │   ├── Sidebar.jsx         # Category management sidebar
 │   ├── TodoForm.jsx        # Form for creating/editing todos
 │   ├── TodoList.jsx        # Main todo list display
-│   └── VersionHistory.jsx  # Version control modal
+│   └── TodoDetailView.jsx  # Detailed todo view modal
 ├── utils/
 │   └── indexedDB.js        # IndexedDB utilities and CRUD operations
 ├── App.jsx                 # Main application component
@@ -128,11 +119,10 @@ src/
 
 ### IndexedDB Schema
 
-The application uses three main stores:
+The application uses two main stores:
 
 1. **todos**: Main todo items with all properties
 2. **categories**: User-defined categories
-3. **versions**: Version history for each todo
 
 ### Key Technologies
 
