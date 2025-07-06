@@ -464,6 +464,10 @@ body {
   color: #1e293b;
 }
 
+.dark-mode .modal-header h2 {
+  color: #f9fafb;
+}
+
 .modal-close-btn {
   position: fixed;
   top: 2rem;
@@ -497,6 +501,10 @@ body {
   margin-bottom: 0.5rem;
   font-weight: 500;
   color: #374151;
+}
+
+.dark-mode .form-group label {
+  color: #d1d5db;
 }
 
 .form-group input,

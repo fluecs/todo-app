@@ -13,7 +13,7 @@ import {
   Eye,
   Copy
 } from 'lucide-react'
-import { formatDate, isOverdue, getPriorityColor, getTypeIcon, getCategoryName } from '../utils/helpers'
+import { formatDate, isOverdue, getPriorityColor, getTypeIcon, getCategoryName } from '../utils/helpers.jsx'
 import TodoDetailView from './TodoDetailView'
 
 const TodoList = ({ todos, categories, onToggleComplete, onEdit, onDelete, onDuplicate, onRefresh }) => {

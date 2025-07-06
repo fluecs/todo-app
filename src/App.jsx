@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { initDB, getAllItems, addItem, updateItem, deleteItem } from './utils/indexedDB'
-import { filterTodos, sortTodos, createTodoData, updateTodoData, getStoredDarkMode, setStoredDarkMode } from './utils/helpers'
+import { filterTodos, sortTodos, createTodoData, updateTodoData, getStoredDarkMode, setStoredDarkMode } from './utils/helpers.jsx'
 import TopNav from './components/TopNav'
 import Sidebar from './components/Sidebar'
 import TodoList from './components/TodoList'

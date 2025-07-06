@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, CheckCircle, Circle, Calendar, Tag, AlertTriangle, Clock, FileText, List, CheckSquare, ChevronDown } from 'lucide-react'
 import { updateItem } from '../utils/indexedDB'
-import { formatDate, isOverdue, getPriorityColor, getTypeIconLarge, getCategoryName } from '../utils/helpers'
+import { formatDate, isOverdue, getPriorityColor, getTypeIconLarge, getCategoryName } from '../utils/helpers.jsx'
 
 const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh }) => {
   const [checklistItems, setChecklistItems] = useState(todo.checklistItems || [])
@@ -131,39 +131,48 @@ const TodoDetailView = ({ todo, categories, onClose, onToggleComplete, onRefresh
           </div>
         </div>
 
-        <DetailSection title="Content">
-          <p>{currentTodo.content}</p>
-        </DetailSection>
+        {/* Show content for memo type, or when content exists for other types */}
+        {(currentTodo.type === 'memo' || currentTodo.content) && (
+          <DetailSection title="Content">
+            <p>{currentTodo.content}</p>
+          </DetailSection>
+        )}
 
-        <DetailSection title="List Items">
-          <div className="list-items">
-            {currentTodo.listItems?.map((item, index) => (
-              <div key={index} className="list-item">
-                <div className="list-bullet">•</div>
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-        </DetailSection>
-
-        <DetailSection title={`Checklist (${checklistItems.filter(item => item.completed).length} of ${checklistItems.length} completed)`}>
-          <div className="checklist-items">
-            {checklistItems.map((item, index) => (
-              <div 
-                key={index} 
-                className={`checklist-item ${item.completed ? 'completed' : ''}`}
-                onClick={() => handleChecklistToggle(index)}
-              >
-                <div className="checklist-toggle">
-                  {item.completed ? <CheckCircle size={18} /> : <Circle size={18} />}
+        {/* Show list items only for list type */}
+        {currentTodo.type === 'list' && currentTodo.listItems?.length > 0 && (
+          <DetailSection title="List Items">
+            <div className="list-items">
+              {currentTodo.listItems.map((item, index) => (
+                <div key={index} className="list-item">
+                  <div className="list-bullet">•</div>
+                  <span>{item}</span>
                 </div>
-                <span className={item.completed ? 'completed' : ''}>
-                  {item.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        </DetailSection>
+              ))}
+            </div>
+          </DetailSection>
+        )}
+
+        {/* Show checklist only for checklist type */}
+        {currentTodo.type === 'checklist' && checklistItems.length > 0 && (
+          <DetailSection title={`Checklist (${checklistItems.filter(item => item.completed).length} of ${checklistItems.length} completed)`}>
+            <div className="checklist-items">
+              {checklistItems.map((item, index) => (
+                <div 
+                  key={index} 
+                  className={`checklist-item ${item.completed ? 'completed' : ''}`}
+                  onClick={() => handleChecklistToggle(index)}
+                >
+                  <div className="checklist-toggle">
+                    {item.completed ? <CheckCircle size={18} /> : <Circle size={18} />}
+                  </div>
+                  <span className={item.completed ? 'completed' : ''}>
+                    {item.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </DetailSection>
+        )}
 
         <DetailSection title="Tags">
           <div className="tags-list">
