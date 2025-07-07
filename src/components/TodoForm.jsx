@@ -1,6 +1,69 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, memo, useCallback } from 'react'
 import { X, Calendar, Tag, AlertTriangle, CheckSquare, List, FileText, Palette } from 'lucide-react'
 import { format } from 'date-fns'
+
+const ItemList = React.memo(function ItemList({ items, type, maxItems = 3, inputValue, setInputValue, addItem, removeItem, toggleChecklistItem, expanded, setExpanded }) {
+  const displayItems = items?.length ? items.slice(0, expanded[type] ? undefined : maxItems) : []
+  const remaining = items?.length ? items.length - maxItems : 0
+  return (
+    <div className={`${type}-items`}>
+      {displayItems.map((item, index) => (
+        <div key={index} className={`${type}-item`}>
+          {type === 'checklist' ? (
+            <>
+              <div className="checkbox-container">
+                <input
+                  type="checkbox"
+                  checked={item.completed}
+                  onChange={() => toggleChecklistItem(index)}
+                />
+              </div>
+              <span className={item.completed ? 'completed' : ''}>{item.text}</span>
+            </>
+          ) : (
+            <>
+              <div className="list-bullet">•</div>
+              <span>{item}</span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => removeItem(type, index)}
+            className="remove-item-btn"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      {remaining > 0 && (
+        <button
+          type="button"
+          className="expand-btn"
+          onClick={() => setExpanded(prev => ({ ...prev, [type]: !prev[type] }))}
+        >
+          {expanded[type] ? 'Show less' : `+${remaining} more items`}
+        </button>
+      )}
+      <div className={`add-${type}-item`}>
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder={`Add ${type} item...`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addItem(type, inputValue);
+              setInputValue('');
+            }
+          }}
+          autoComplete="off"
+        />
+        <button type="button" onClick={() => { addItem(type, inputValue); setInputValue(''); }}>Add</button>
+      </div>
+    </div>
+  )
+})
 
 const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -53,7 +116,7 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
     }
   }
 
-  const addItem = (type, value) => {
+  const addItem = useCallback((type, value) => {
     if (!value.trim()) return
     const updates = {
       checklist: { checklistItems: [...formData.checklistItems, { text: value.trim(), completed: false }] },
@@ -62,25 +125,25 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
     }
     setFormData(prev => ({ ...prev, ...updates[type] }))
     setItemInputs(prev => ({ ...prev, [type]: '' }))
-  }
+  }, [formData])
 
-  const removeItem = (type, index) => {
+  const removeItem = useCallback((type, index) => {
     const updates = {
       checklist: { checklistItems: formData.checklistItems.filter((_, i) => i !== index) },
       list: { listItems: formData.listItems.filter((_, i) => i !== index) },
       tag: { tags: formData.tags.filter((_, i) => i !== index) }
     }
     setFormData(prev => ({ ...prev, ...updates[type] }))
-  }
+  }, [formData])
 
-  const toggleChecklistItem = (index) => {
+  const toggleChecklistItem = useCallback((index) => {
     setFormData(prev => ({
       ...prev,
       checklistItems: prev.checklistItems.map((item, i) => 
         i === index ? { ...item, completed: !item.completed } : item
       )
     }))
-  }
+  }, [])
 
   const TypeButton = ({ type, icon: Icon, label }) => (
     <button
@@ -92,69 +155,6 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
       {label}
     </button>
   )
-
-  const ItemList = ({ items, type, maxItems = 3, inputValue, setInputValue }) => {
-    const displayItems = items?.length ? items.slice(0, expanded[type] ? undefined : maxItems) : []
-    const remaining = items?.length ? items.length - maxItems : 0
-    return (
-      <div className={`${type}-items`}>
-        {displayItems.map((item, index) => (
-          <div key={index} className={`${type}-item`}>
-            {type === 'checklist' ? (
-              <>
-                <div className="checkbox-container">
-                  <input
-                    type="checkbox"
-                    checked={item.completed}
-                    onChange={() => toggleChecklistItem(index)}
-                  />
-                </div>
-                <span className={item.completed ? 'completed' : ''}>{item.text}</span>
-              </>
-            ) : (
-              <>
-                <div className="list-bullet">•</div>
-                <span>{item}</span>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => removeItem(type, index)}
-              className="remove-item-btn"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-        {remaining > 0 && (
-          <button
-            type="button"
-            className="expand-btn"
-            onClick={() => setExpanded(prev => ({ ...prev, [type]: !prev[type] }))}
-          >
-            {expanded[type] ? 'Show less' : `+${remaining} more items`}
-          </button>
-        )}
-        <div className={`add-${type}-item`}>
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={`Add ${type} item...`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addItem(type, inputValue);
-                setInputValue('');
-              }
-            }}
-            autoComplete="off"
-          />
-          <button type="button" onClick={() => { addItem(type, inputValue); setInputValue(''); }}>Add</button>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="modal-overlay">
@@ -236,14 +236,34 @@ const TodoForm = ({ categories, editingTodo, onSubmit, onCancel }) => {
           {formData.type === 'list' && (
             <div className="form-group">
               <label>List Items</label>
-              <ItemList items={formData.listItems} type="list" inputValue={itemInputs.list} setInputValue={val => setItemInputs(prev => ({ ...prev, list: val }))} />
+              <ItemList
+                items={formData.listItems}
+                type="list"
+                inputValue={itemInputs.list}
+                setInputValue={val => setItemInputs(prev => ({ ...prev, list: val }))}
+                addItem={addItem}
+                removeItem={removeItem}
+                toggleChecklistItem={toggleChecklistItem}
+                expanded={expanded}
+                setExpanded={setExpanded}
+              />
             </div>
           )}
 
           {formData.type === 'checklist' && (
             <div className="form-group">
               <label>Checklist Items</label>
-              <ItemList items={formData.checklistItems} type="checklist" inputValue={itemInputs.checklist} setInputValue={val => setItemInputs(prev => ({ ...prev, checklist: val }))} />
+              <ItemList
+                items={formData.checklistItems}
+                type="checklist"
+                inputValue={itemInputs.checklist}
+                setInputValue={val => setItemInputs(prev => ({ ...prev, checklist: val }))}
+                addItem={addItem}
+                removeItem={removeItem}
+                toggleChecklistItem={toggleChecklistItem}
+                expanded={expanded}
+                setExpanded={setExpanded}
+              />
             </div>
           )}
 
