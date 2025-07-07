@@ -65,9 +65,12 @@ function App() {
     }
   }
 
-  const handleAddTodo = (todoData) => handleTodoAction(
-    () => addItem('todos', createTodoData(todoData))
-  )
+  const handleAddTodo = (todoData) => {
+    console.log('handleAddTodo received:', todoData)
+    handleTodoAction(
+      () => addItem('todos', createTodoData(todoData))
+    )
+  }
 
   const handleUpdateTodo = (todoId, updatedData) => handleTodoAction(
     () => updateItem('todos', updateTodoData(todoId, updatedData))

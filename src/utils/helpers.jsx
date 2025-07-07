@@ -91,18 +91,46 @@ export const filterTodos = (todos, { selectedCategory, filterBy, selectedTags, s
 }
 
 // Form utilities
-export const createTodoData = (formData) => ({
-  ...formData,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  completed: false
-})
+export const createTodoData = (formData) => {
+  const base = {
+    ...formData,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    completed: false
+  }
+  // Only keep relevant items based on type
+  if (base.type === 'list') {
+    delete base.checklistItems
+    if (!base.listItems || base.listItems.length === 0) delete base.listItems
+  } else if (base.type === 'checklist') {
+    delete base.listItems
+    if (!base.checklistItems || base.checklistItems.length === 0) delete base.checklistItems
+  } else {
+    delete base.listItems
+    delete base.checklistItems
+  }
+  return base
+}
 
-export const updateTodoData = (todoId, updatedData) => ({
-  ...updatedData,
-  id: todoId,
-  updatedAt: new Date().toISOString()
-})
+export const updateTodoData = (todoId, updatedData) => {
+  const base = {
+    ...updatedData,
+    id: todoId,
+    updatedAt: new Date().toISOString()
+  }
+  // Only keep relevant items based on type
+  if (base.type === 'list') {
+    delete base.checklistItems
+    if (!base.listItems || base.listItems.length === 0) delete base.listItems
+  } else if (base.type === 'checklist') {
+    delete base.listItems
+    if (!base.checklistItems || base.checklistItems.length === 0) delete base.checklistItems
+  } else {
+    delete base.listItems
+    delete base.checklistItems
+  }
+  return base
+}
 
 // Validation utilities
 export const validateTodo = (todo) => {
